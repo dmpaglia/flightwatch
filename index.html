@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flightwatch — Route Price Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Fraunces:ital,opsz,wght@0,9..144,300;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #111;
+  --ink2: #555;
+  --ink3: #999;
+  --ink4: #ccc;
+  --paper: #f4f1eb;
+  --paper2: #ece8df;
+  --paper3: #e2ddd3;
+  --paper4: #d8d2c6;
+  --accent: #1c3f6e;
+  --accent-bg: #eaf0f8;
+  --accent-mid: #4a7ab5;
+  --green: #1a5c38;
+  --green-bg: #e8f5ee;
+  --red: #5c1e1e;
+  --red-bg: #faeaea;
+  --amber: #5c3a0a;
+  --amber-bg: #fdf3e0;
+  --border: rgba(17,17,17,0.1);
+  --r: 5px;
+  --mono: 'DM Mono', monospace;
+  --serif: 'Fraunces', Georgia, serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--mono); background: var(--paper); color: var(--ink); min-height: 100vh; font-size: 13px; line-height: 1.6; }
+
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 28px; border-bottom: 1px solid var(--border);
+  background: var(--paper); position: sticky; top: 0; z-index: 50;
+}
+.logo { font-family: var(--serif); font-size: 20px; font-weight: 300; font-style: italic; color: var(--ink); letter-spacing: -0.01em; }
+.logo em { color: var(--accent); font-style: normal; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.pill { font-size: 11px; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border); color: var(--ink3); background: var(--paper2); }
+
+.btn { font-family: var(--mono); font-size: 12px; padding: 6px 14px; border-radius: var(--r); border: 1px solid var(--border); background: var(--paper2); color: var(--ink2); cursor: pointer; transition: all 0.15s; }
+.btn:hover { background: var(--paper3); color: var(--ink); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { background: #2a5490; }
+.btn.danger { background: var(--red-bg); color: var(--red); border-color: transparent; }
+
+.layout { display: grid; grid-template-columns: 300px 1fr; min-height: calc(100vh - 57px); }
+
+.sidebar { border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--paper); }
+.sidebar-section { padding: 18px 18px; border-bottom: 1px solid var(--border); }
+.sidebar-label { font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); margin-bottom: 10px; }
+
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.field label { font-size: 11px; color: var(--ink3); }
+.field input, .field select {
+  font-family: var(--mono); font-size: 13px; padding: 7px 9px;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--paper2); color: var(--ink); width: 100%; outline: none; transition: border-color 0.15s;
+}
+.field input:focus, .field select:focus { border-color: var(--accent-mid); background: #fff; }
+.field input.airport { text-transform: uppercase; font-size: 17px; font-weight: 500; letter-spacing: 0.05em; }
+.route-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 6px; margin-bottom: 8px; }
+.swap-btn { font-size: 15px; padding: 7px; background: var(--paper3); border: 1px solid var(--border); border-radius: var(--r); cursor: pointer; color: var(--ink3); transition: all 0.15s; margin-bottom: 1px; }
+.swap-btn:hover { background: var(--paper4); color: var(--ink); }
+.dates-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cabin-pax-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.search-btn { width: 100%; padding: 9px; font-size: 13px; margin-top: 2px; }
+
+.routes-list { flex: 1; overflow-y: auto; }
+.route-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 18px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background 0.1s; position: relative;
+}
+.route-item:hover { background: var(--paper2); }
+.route-item.active { background: var(--accent-bg); }
+.route-item.active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); border-radius: 0 2px 2px 0; }
+.route-code { font-size: 13px; font-weight: 500; color: var(--ink); letter-spacing: 0.02em; }
+.route-meta { font-size: 11px; color: var(--ink3); margin-top: 1px; }
+.route-price { margin-left: auto; font-size: 13px; font-weight: 500; color: var(--green); white-space: nowrap; }
+.route-price.stale { color: var(--ink3); }
+.route-delete { opacity: 0; font-size: 14px; color: var(--ink4); background: none; border: none; cursor: pointer; padding: 2px 5px; border-radius: 3px; transition: all 0.15s; font-family: var(--mono); }
+.route-item:hover .route-delete { opacity: 1; }
+.route-delete:hover { background: var(--red-bg); color: var(--red); }
+.empty-routes { padding: 28px 18px; text-align: center; color: var(--ink3); font-size: 12px; line-height: 1.9; }
+.empty-routes .big { font-family: var(--serif); font-size: 32px; font-style: italic; color: var(--ink4); display: block; margin-bottom: 8px; }
+
+.main { display: flex; flex-direction: column; overflow: hidden; }
+.main-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--ink3); padding: 40px; text-align: center; }
+.main-empty .heading { font-family: var(--serif); font-size: 30px; font-style: italic; font-weight: 300; color: var(--ink2); line-height: 1.2; }
+.main-empty p { font-size: 13px; color: var(--ink3); max-width: 340px; line-height: 1.8; }
+
+.result-header { padding: 18px 26px 14px; border-bottom: 1px solid var(--border); }
+.result-route { font-family: var(--serif); font-size: 24px; font-weight: 300; font-style: italic; color: var(--ink); letter-spacing: -0.01em; margin-bottom: 5px; }
+.result-meta { font-size: 11px; color: var(--ink3); display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+
+.stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--border); }
+.stat { padding: 14px 22px; border-right: 1px solid var(--border); }
+.stat:last-child { border-right: none; }
+.stat-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); margin-bottom: 5px; }
+.stat-value { font-size: 20px; font-weight: 500; color: var(--ink); }
+.stat-value.green { color: var(--green); }
+.stat-value.red { color: var(--red); }
+.stat-sub { font-size: 11px; color: var(--ink3); margin-top: 2px; }
+
+.flights-area { flex: 1; overflow-y: auto; }
+.table-header {
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  padding: 9px 26px; background: var(--paper2); border-bottom: 1px solid var(--border);
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3);
+  position: sticky; top: 0;
+}
+.th { cursor: pointer; user-select: none; }
+.th:hover { color: var(--ink); }
+.th.sort-active { color: var(--accent); }
+
+.flight-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; padding: 13px 26px; border-bottom: 1px solid var(--border); align-items: center; transition: background 0.1s; }
+.flight-row:hover { background: var(--paper2); }
+.flight-row.best { background: var(--green-bg); }
+.flight-row.best:hover { background: #ddf0e6; }
+.airline-name { font-size: 13px; font-weight: 500; }
+.airline-code { font-size: 11px; color: var(--ink3); margin-top: 1px; }
+.stops-badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 500; }
+.stops-badge.nonstop { background: var(--green-bg); color: var(--green); }
+.stops-badge.one { background: var(--amber-bg); color: var(--amber); }
+.stops-badge.two { background: var(--red-bg); color: var(--red); }
+.flight-price { font-size: 15px; font-weight: 500; color: var(--ink); }
+.flight-price.cheapest { color: var(--green); }
+.best-tag { display: inline-block; font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--green); color: #fff; margin-left: 8px; vertical-align: middle; letter-spacing: 0.04em; }
+
+.bottom-panels { border-top: 1px solid var(--border); }
+.ai-response { padding: 16px 26px; background: var(--paper); border-bottom: 1px solid var(--border); font-size: 12px; line-height: 1.75; color: var(--ink2); }
+.ai-tag { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 3px; background: var(--accent-bg); color: var(--accent); margin-bottom: 8px; letter-spacing: 0.05em; text-transform: uppercase; }
+
+.history-section { padding: 16px 26px; background: var(--paper2); border-bottom: 1px solid var(--border); }
+.history-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); margin-bottom: 10px; }
+.history-bars { display: flex; align-items: flex-end; gap: 3px; height: 44px; }
+.hbar { flex: 1; border-radius: 2px 2px 0 0; min-height: 4px; cursor: pointer; transition: opacity 0.1s; }
+.hbar:hover { opacity: 0.7; }
+.history-meta { display: flex; justify-content: space-between; font-size: 10px; color: var(--ink4); margin-top: 5px; }
+
+.alerts-section { padding: 13px 26px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--paper); }
+.alert-input-row { display: flex; gap: 8px; align-items: center; }
+.alert-input-row input { font-family: var(--mono); font-size: 13px; padding: 5px 9px; border: 1px solid var(--border); border-radius: var(--r); background: var(--paper2); color: var(--ink); width: 110px; outline: none; }
+.alert-input-row input:focus { border-color: var(--accent-mid); background: #fff; }
+.alert-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.alert-chip { display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 4px 10px; background: var(--accent-bg); color: var(--accent); border-radius: 20px; border: 1px solid rgba(28,63,110,0.15); }
+.alert-chip button { background: none; border: none; cursor: pointer; color: var(--accent-mid); font-size: 13px; line-height: 1; padding: 0; }
+.alert-chip button:hover { color: var(--red); }
+.alert-fired { background: var(--green-bg) !important; color: var(--green) !important; border-color: rgba(26,92,56,0.2) !important; }
+
+.loading-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--ink3); }
+.spinner { width: 26px; height: 26px; border: 2px solid var(--paper3); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(17,17,17,0.45); z-index: 200; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--paper); border-radius: 8px; border: 1px solid var(--border); padding: 26px; max-width: 480px; width: 90%; box-shadow: 0 8px 40px rgba(0,0,0,0.12); }
+.modal h2 { font-family: var(--serif); font-size: 20px; font-weight: 300; font-style: italic; margin-bottom: 8px; }
+.modal p { font-size: 12px; color: var(--ink3); line-height: 1.7; margin-bottom: 10px; }
+.modal ol { font-size: 12px; color: var(--ink2); padding-left: 18px; line-height: 2.1; }
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">Flight<em>watch</em></div>
+  <div class="header-right">
+    <span class="pill" id="route-count">0 routes</span>
+    <button class="btn" onclick="openKeyModal()" id="key-btn" title="Set API key">🔑 API key</button>
+    <button class="btn" onclick="openHelp()">Share / deploy ↗</button>
+    <button class="btn danger" onclick="clearAll()">Clear all</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Search a route</div>
+      <div style="display:flex; gap:6px; margin-bottom:10px;">
+        <button id="btn-roundtrip" class="btn primary" style="flex:1; font-size:11px; padding:5px;" onclick="setTripType('roundtrip')">Round trip</button>
+        <button id="btn-oneway" class="btn" style="flex:1; font-size:11px; padding:5px;" onclick="setTripType('oneway')">One way</button>
+      </div>
+      <div class="route-row">
+        <div class="field">
+          <label>From</label>
+          <input class="airport" id="origin" type="text" maxlength="3" placeholder="JFK" value="JFK">
+        </div>
+        <button class="swap-btn" onclick="swapAirports()">⇄</button>
+        <div class="field">
+          <label>To</label>
+          <input class="airport" id="dest" type="text" maxlength="3" placeholder="LHR" value="LHR">
+        </div>
+      </div>
+      <div class="dates-row">
+        <div class="field"><label>Depart</label><input type="date" id="depart"></div>
+        <div class="field" id="return-field"><label>Return</label><input type="date" id="return-date"></div>
+      </div>
+      <div class="cabin-pax-row">
+        <div class="field">
+          <label>Cabin</label>
+          <select id="cabin">
+            <option>Economy</option>
+            <option>Premium Economy</option>
+            <option>Business</option>
+            <option>First</option>
+          </select>
+        </div>
+        <div class="field"><label>Adults</label><input type="number" id="adults" value="1" min="1" max="9"></div>
+      </div>
+      <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--ink2); cursor:pointer; margin-bottom:8px; padding:2px 0;"><input type="checkbox" id="nonstop" style="width:14px; height:14px; accent-color:var(--accent); cursor:pointer;"> Nonstop flights only</label>
+      <button class="btn primary search-btn" onclick="searchPrices()">Search with Claude AI →</button>
+    </div>
+    <div class="sidebar-label" style="padding: 14px 18px 0; margin-bottom: 0;">Watched routes</div>
+    <div class="routes-list" id="routes-list">
+      <div class="empty-routes"><span class="big">✈</span>Search a route to start tracking prices</div>
+    </div>
+  </aside>
+
+  <main class="main" id="main-panel">
+    <div class="main-empty">
+      <div class="heading">Track any route,<br>any cabin class.</div>
+      <p>Claude AI searches the web for real prices and saves history here — no API keys needed.</p>
+    </div>
+  </main>
+</div>
+
+
+<div class="modal-overlay" id="key-modal">
+  <div class="modal">
+    <h2>Anthropic API key</h2>
+    <p>Your key is saved only in this browser and never sent anywhere except directly to Anthropic. You only need to do this once.</p>
+    <div class="field" style="margin-top:12px;">
+      <label>API key (starts with sk-ant-...)</label>
+      <input type="password" id="api-key-input" placeholder="sk-ant-..." style="font-family:var(--mono); font-size:12px; padding:8px 10px; border:1px solid var(--border); border-radius:var(--r); background:var(--paper2); color:var(--ink); width:100%; outline:none;">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeKeyModal()">Cancel</button>
+      <button class="btn primary" onclick="saveKey()">Save key</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="help-modal">
+  <div class="modal">
+    <h2>Deploy & share Flightwatch</h2>
+    <p>Your routes and history are saved in this browser. To access from any device or share the app, host it free on GitHub Pages:</p>
+    <ol>
+      <li>Go to <strong>github.com</strong> → New repository → name it <strong>flightwatch</strong></li>
+      <li>Click <strong>Add file → Upload files</strong> and upload <strong>index.html</strong></li>
+      <li>Go to <strong>Settings → Pages</strong> → Source: <em>Deploy from branch → main</em></li>
+      <li>Your live URL: <strong>yourusername.github.io/flightwatch</strong></li>
+    </ol>
+    <p style="margin-top:12px;">Bookmark the URL. It's yours forever, free. Export your saved data below to move it between devices.</p>
+    <div class="modal-footer">
+      <button class="btn" onclick="exportData()">Export routes (JSON)</button>
+      <button class="btn primary" onclick="closeHelp()">Got it</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'flightwatch_v2';
+let state = { routes: [], activeId: null, sortField: 'price', sortDir: 1 };
+let tripType = 'roundtrip';
+
+function setTripType(type) {
+  tripType = type;
+  document.getElementById('btn-roundtrip').className = 'btn' + (type==='roundtrip'?' primary':'');
+  document.getElementById('btn-oneway').className = 'btn' + (type==='oneway'?' primary':'');
+  document.getElementById('return-field').style.visibility = type==='oneway' ? 'hidden' : 'visible';
+}
+
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function load() {
+  try { const r = localStorage.getItem(STORAGE_KEY); if (r) state = JSON.parse(r); } catch(e) {}
+}
+
+load();
+const today = new Date();
+const fmt = d => d.toISOString().split('T')[0];
+document.getElementById('depart').value = fmt(new Date(today.getTime() + 30*864e5));
+document.getElementById('return-date').value = fmt(new Date(today.getTime() + 37*864e5));
+renderSidebar();
+if (localStorage.getItem('fw_api_key')) document.getElementById('key-btn').textContent = '🔑 Key saved';
+if (state.activeId) { const r = state.routes.find(r => r.id === state.activeId); if (r) renderMain(r); }
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function swapAirports() { const o = document.getElementById('origin'), d = document.getElementById('dest'); [o.value, d.value] = [d.value.toUpperCase(), o.value.toUpperCase()]; }
+function parseDuration(s) { if (!s) return 0; const h = parseInt(s.match(/(\d+)h/)?.[1]||0), m = parseInt(s.match(/(\d+)m/)?.[1]||0); return h*60+m; }
+function timeAgo(ts) { const m = Math.floor((Date.now()-ts)/60000); if (m<1) return 'just now'; if (m<60) return m+'m ago'; const h=Math.floor(m/60); if (h<24) return h+'h ago'; return Math.floor(h/24)+'d ago'; }
+function fmtPrice(p, cur) {
+  if (!p && p!==0) return '—';
+  try { return new Intl.NumberFormat('en-US',{style:'currency',currency:cur||'USD',maximumFractionDigits:0}).format(p); } catch(e) { return '$'+Math.round(p).toLocaleString(); }
+}
+
+function renderSidebar() {
+  document.getElementById('route-count').textContent = state.routes.length + ' route' + (state.routes.length!==1?'s':'');
+  const list = document.getElementById('routes-list');
+  if (!state.routes.length) { list.innerHTML = '<div class="empty-routes"><span class="big">✈</span>Search a route to start tracking prices</div>'; return; }
+  list.innerHTML = state.routes.map(r => {
+    const last = r.searches?.[r.searches.length-1];
+    const low = last?.flights?.length ? Math.min(...last.flights.map(f=>f.price).filter(Boolean)) : null;
+    const stale = !last || (Date.now()-last.ts > 24*3600000);
+    const cur = last?.flights?.[0]?.currency || 'USD';
+    return `<div class="route-item${r.id===state.activeId?' active':''}" onclick="selectRoute('${r.id}')">
+      <div style="flex:1; min-width:0;">
+        <div class="route-code">${r.origin} → ${r.dest}</div>
+        <div class="route-meta">${r.cabin} · ${r.adults} pax · ${r.depart}</div>
+      </div>
+      <div class="route-price${stale?' stale':''}">${low ? fmtPrice(low,cur) : '—'}</div>
+      <button class="route-delete" onclick="deleteRoute('${r.id}',event)">×</button>
+    </div>`;
+  }).join('');
+}
+
+function selectRoute(id) { state.activeId = id; save(); renderSidebar(); const r = state.routes.find(r=>r.id===id); if (r) renderMain(r); }
+
+function deleteRoute(id, e) {
+  e.stopPropagation();
+  state.routes = state.routes.filter(r=>r.id!==id);
+  if (state.activeId===id) state.activeId = state.routes[0]?.id || null;
+  save(); renderSidebar();
+  const r = state.routes.find(r=>r.id===state.activeId);
+  if (r) renderMain(r); else showEmpty();
+}
+
+function clearAll() {
+  if (!confirm('Remove all watched routes?')) return;
+  state.routes = []; state.activeId = null; save(); renderSidebar(); showEmpty();
+}
+
+function showEmpty() {
+  document.getElementById('main-panel').innerHTML = `<div class="main-empty"><div class="heading">Track any route,<br>any cabin class.</div><p>Claude AI searches the web for real prices and saves history here — no API keys needed.</p></div>`;
+}
+
+async function searchPrices() {
+  const origin = document.getElementById('origin').value.trim().toUpperCase();
+  const dest = document.getElementById('dest').value.trim().toUpperCase();
+  const depart = document.getElementById('depart').value;
+  const returnDate = tripType === 'oneway' ? '' : document.getElementById('return-date').value;
+  const cabin = document.getElementById('cabin').value;
+  const adults = parseInt(document.getElementById('adults').value)||1;
+  const nonstopOnly = document.getElementById('nonstop').checked;
+
+  if (origin.length!==3||dest.length!==3) { alert('Please enter valid 3-letter IATA codes (e.g. JFK, LHR)'); return; }
+  if (!depart) { alert('Please pick a departure date.'); return; }
+
+  let route = state.routes.find(r => r.origin===origin && r.dest===dest && r.depart===depart && r.cabin===cabin && r.adults===adults);
+  if (!route) { route = { id: uid(), origin, dest, depart, returnDate, cabin, adults, nonstopOnly, searches: [], alerts: [] }; state.routes.unshift(route); }
+  state.activeId = route.id;
+  save(); renderSidebar();
+
+  showPasteUI(route, origin, dest, depart, returnDate, cabin, adults, nonstopOnly);
+}
+
+async function callClaude(origin, dest, depart, returnDate, cabin, adults) {
+  const prompt = `Search the web right now for current flight prices. I need REAL prices from real booking sites.
+
+Route: ${origin} to ${dest}
+Departure: ${depart}
+${returnDate ? `Return: ${returnDate}` : 'Trip type: one-way'}
+Cabin: ${cabin}
+Adults: ${adults}
+
+Search Google Flights, Expedia, Kayak, or similar sites and find real current prices. Find at least 4 different airline options if possible.
+
+Reply with ONLY a raw JSON object — no markdown, no backticks, no explanation before or after. Format:
+{"currency":"USD","flights":[{"airline":"Airline Name","code":"XX","price":1234,"currency":"USD","stops":0,"duration":"7h 30m","outbound_time":"08:00","arrival_time":"21:30"}],"summary":"2-3 sentence summary with price range, best deal, any booking tips"}`;
+
+  const apiKey = localStorage.getItem('fw_api_key') || '';
+  if (!apiKey) throw new Error('No API key set. Click the key icon in the header to add your Anthropic API key.');
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1500,
+      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+
+  if (!resp.ok) {
+    const e = await resp.json().catch(()=>({}));
+    throw new Error(e.error?.message || 'API error ' + resp.status);
+  }
+
+  const data = await resp.json();
+  const text = data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('Could not find price data in Claude\'s response. Raw: ' + text.slice(0,300));
+  let parsed;
+  try { parsed = JSON.parse(match[0]); } catch(e) { throw new Error('Failed to parse price data.'); }
+  if (!parsed.flights?.length) throw new Error('No flights returned. Try again or adjust your search.');
+  return { flights: parsed.flights, summary: parsed.summary || '' };
+}
+
+
+function buildPrompt(origin, dest, depart, returnDate, cabin, adults, nonstopOnly) {
+  return `Search the web right now for current flight prices. I need REAL prices from real booking sites.\n\nRoute: ${origin} to ${dest}\nDeparture: ${depart}\n${returnDate ? 'Return: ' + returnDate : 'Trip type: one-way'}\nCabin: ${cabin}\nAdults: ${adults}\n${nonstopOnly ? 'NONSTOP FLIGHTS ONLY - do not include connecting flights' : ''}\n\nSearch Google Flights, Expedia, Kayak, or similar and find real current prices. Find at least 4-6 options.\n\nReply with ONLY a raw JSON object, no markdown, no backticks. Format exactly:\n{"currency":"USD","flights":[{"airline":"Airline Name","code":"XX","price":1234,"currency":"USD","stops":0,"duration":"7h 30m","outbound_time":"08:00","arrival_time":"21:30"}],"summary":"2-3 sentence summary"}`;
+}
+
+function showPasteUI(route, origin, dest, depart, returnDate, cabin, adults, nonstopOnly) {
+  const prompt = buildPrompt(origin, dest, depart, returnDate, cabin, adults, nonstopOnly);
+  const claudeUrl = 'https://claude.ai/new?q=' + encodeURIComponent(prompt);
+  document.getElementById('main-panel').innerHTML = `
+    <div style="padding:32px; max-width:580px;">
+      <div style="font-family:var(--serif); font-size:22px; font-style:italic; margin-bottom:6px;">${origin} \u2192 ${dest}</div>
+      <p style="font-size:13px; color:var(--ink3); margin-bottom:24px; line-height:1.7;">${cabin} \u00b7 ${adults} adult${adults>1?'s':''} \u00b7 ${depart}${returnDate?' \u2013 '+returnDate:''}</p>
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <div style="display:flex; gap:14px; align-items:flex-start;">
+          <div style="width:26px; height:26px; border-radius:50%; background:var(--accent); color:#fff; font-size:12px; font-weight:500; display:flex; align-items:center; justify-content:center; flex-shrink:0;">1</div>
+          <div>
+            <div style="font-size:13px; font-weight:500; margin-bottom:8px;">Open Claude.ai \u2014 the prompt is pre-loaded</div>
+            <a href="${claudeUrl}" target="_blank" style="display:inline-block; font-family:var(--mono); font-size:12px; padding:8px 16px; background:var(--accent); color:#fff; border-radius:var(--r); text-decoration:none;">Open Claude.ai \u2192</a>
+          </div>
+        </div>
+        <div style="display:flex; gap:14px; align-items:flex-start;">
+          <div style="width:26px; height:26px; border-radius:50%; background:var(--accent); color:#fff; font-size:12px; font-weight:500; display:flex; align-items:center; justify-content:center; flex-shrink:0;">2</div>
+          <div style="font-size:13px; line-height:1.8; color:var(--ink2);">Wait for Claude to search the web and respond. Then <strong style="color:var(--ink);">copy its entire response.</strong></div>
+        </div>
+        <div style="display:flex; gap:14px; align-items:flex-start;">
+          <div style="width:26px; height:26px; border-radius:50%; background:var(--accent); color:#fff; font-size:12px; font-weight:500; display:flex; align-items:center; justify-content:center; flex-shrink:0;">3</div>
+          <div style="flex:1;">
+            <div style="font-size:13px; font-weight:500; margin-bottom:8px;">Paste Claude's response here</div>
+            <textarea id="json-paste" placeholder='Paste here...' style="width:100%; height:110px; font-family:var(--mono); font-size:11px; padding:9px; border:1px solid var(--border); border-radius:var(--r); background:var(--paper2); color:var(--ink); resize:vertical; outline:none;"></textarea>
+            <button onclick="processJson('${route.id}')" class="btn primary" style="margin-top:8px; width:100%; padding:10px; font-size:13px;">Save prices \u2192</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function processJson(routeId) {
+  const raw = document.getElementById('json-paste').value.trim();
+  if (!raw) { alert('Please paste Claude\'s response first.'); return; }
+  let parsed;
+  try {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no json');
+    parsed = JSON.parse(match[0]);
+  } catch(e) { alert('Could not read that JSON. Make sure you copied Claude\'s full response.'); return; }
+  if (!parsed.flights || !parsed.flights.length) { alert('No flights found in the response. Try the search again.'); return; }
+  const route = state.routes.find(r => r.id === routeId);
+  if (!route) return;
+  route.searches.push({ ts: Date.now(), flights: parsed.flights, raw: parsed.summary || '' });
+  if (route.searches.length > 60) route.searches = route.searches.slice(-60);
+  save(); renderSidebar(); renderMain(route);
+}
+
+function renderMain(route) {
+  const panel = document.getElementById('main-panel');
+  const last = route.searches?.[route.searches.length-1];
+  if (!last) { showEmpty(); return; }
+
+  let flights = [...(last.flights||[])];
+  flights.sort((a,b)=>{
+    const f = state.sortField;
+    if (f==='price') return (a.price-b.price)*state.sortDir;
+    if (f==='duration') return (parseDuration(a.duration)-parseDuration(b.duration))*state.sortDir;
+    if (f==='stops') return (a.stops-b.stops)*state.sortDir;
+    return 0;
+  });
+
+  const prices = flights.map(f=>f.price).filter(Boolean);
+  const lowest = prices.length ? Math.min(...prices) : 0;
+  const avg = prices.length ? Math.round(prices.reduce((a,b)=>a+b,0)/prices.length) : 0;
+  const cur = flights[0]?.currency || 'USD';
+
+  let trendHtml = '<div class="stat-value" style="font-size:14px;color:var(--ink3)">First check</div>';
+  if (route.searches.length >= 2) {
+    const prev = route.searches[route.searches.length-2];
+    const prevLow = Math.min(...prev.flights.map(f=>f.price).filter(Boolean));
+    const diff = lowest - prevLow;
+    const pct = Math.round((diff/prevLow)*100);
+    const cls = diff<0?'green':diff>0?'red':'';
+    trendHtml = `<div class="stat-value ${cls}">${diff>0?'+':''}${pct}%</div><div class="stat-sub">vs last check</div>`;
+  }
+
+  const arr = f => f===state.sortField ? (state.sortDir===1?' ↑':' ↓') : '';
+
+  const allSearches = route.searches;
+  const allLows = allSearches.map(s=>Math.min(...(s.flights||[]).map(f=>f.price).filter(Boolean)));
+  const maxP = Math.max(...allLows), minP = Math.min(...allLows), rangeP = maxP-minP||1;
+  const bars = allLows.map((p,i)=>{
+    const h = Math.max(5, Math.round(((p-minP)/rangeP)*40));
+    const col = p<=minP+rangeP*0.2 ? '#1a5c38' : p>=maxP-rangeP*0.2 ? '#5c1e1e' : '#4a7ab5';
+    return `<div class="hbar" style="height:${h}px;background:${col}" title="${fmtPrice(p,cur)} · ${new Date(allSearches[i].ts).toLocaleDateString()}"></div>`;
+  }).join('');
+
+  const alerts = route.alerts || [];
+  const alertChips = alerts.map((a,i)=>{
+    const fired = lowest > 0 && lowest <= a.price;
+    return `<div class="alert-chip${fired?' alert-fired':''}">${fired?'🔔':'🔕'} below ${fmtPrice(a.price,cur)}<button onclick="removeAlert('${route.id}',${i})">×</button></div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div class="result-header">
+      <div class="result-route">${route.origin} → ${route.dest}${route.returnDate?' → '+route.origin:''}</div>
+      <div class="result-meta">
+        <span>📅 ${route.depart}${route.returnDate?' – '+route.returnDate:''}</span>
+        <span>💺 ${route.cabin}</span>
+        <span>👤 ${route.adults} adult${route.adults>1?'s':''}</span>
+        <span>🕐 ${timeAgo(last.ts)}</span>
+        <span style="margin-left:auto;"><button class="btn" style="font-size:11px;padding:4px 10px;" onclick="refreshRoute('${route.id}')">Refresh ↻</button></span>
+      </div>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-label">Lowest price</div><div class="stat-value green">${fmtPrice(lowest,cur)}</div><div class="stat-sub">${flights.find(f=>f.price===lowest)?.airline||''}</div></div>
+      <div class="stat"><div class="stat-label">Average</div><div class="stat-value">${fmtPrice(avg,cur)}</div><div class="stat-sub">${flights.length} options found</div></div>
+      <div class="stat"><div class="stat-label">Price trend</div>${trendHtml}</div>
+      <div class="stat"><div class="stat-label">Saved checks</div><div class="stat-value">${route.searches.length}</div><div class="stat-sub">price snapshots</div></div>
+    </div>
+
+    <div class="flights-area">
+      <div class="table-header">
+        <div class="th">Airline</div>
+        <div class="th${state.sortField==='stops'?' sort-active':''}" onclick="setSort('stops','${route.id}')">Stops${arr('stops')}</div>
+        <div class="th${state.sortField==='duration'?' sort-active':''}" onclick="setSort('duration','${route.id}')">Duration${arr('duration')}</div>
+        <div class="th">Departs</div>
+        <div class="th${state.sortField==='price'?' sort-active':''}" onclick="setSort('price','${route.id}')">Price${arr('price')}</div>
+      </div>
+      ${flights.map((f,i)=>{
+        const best = f.price===lowest && state.sortField==='price' && i===0;
+        const sc = f.stops===0?'nonstop':f.stops===1?'one':'two';
+        const sl = f.stops===0?'Nonstop':f.stops===1?'1 stop':f.stops+' stops';
+        return `<div class="flight-row${best?' best':''}">
+          <div><div class="airline-name">${f.airline}${best?'<span class="best-tag">BEST</span>':''}</div><div class="airline-code">${f.code||''}</div></div>
+          <div><span class="stops-badge ${sc}">${sl}</span></div>
+          <div>${f.duration||'—'}</div>
+          <div>${f.outbound_time||'—'}</div>
+          <div class="flight-price${best?' cheapest':''}">${fmtPrice(f.price,cur)}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="bottom-panels">
+      ${last.raw ? `<div class="ai-response"><div class="ai-tag">Claude's summary</div><br>${last.raw}</div>` : ''}
+      <div class="history-section">
+        <div class="history-label">Price history · ${allSearches.length} check${allSearches.length!==1?'s':''}</div>
+        <div class="history-bars">${bars||'<span style="font-size:11px;color:var(--ink4)">Will appear after 2+ checks</span>'}</div>
+        <div class="history-meta"><span>${allSearches.length>1?new Date(allSearches[0].ts).toLocaleDateString():''}</span><span>Today</span></div>
+      </div>
+      <div class="alerts-section">
+        <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);white-space:nowrap;">Price alert</div>
+        <div class="alert-input-row">
+          <span style="font-size:12px;color:var(--ink3);">Notify below</span>
+          <input type="number" id="alert-price" placeholder="e.g. 800" min="1">
+          <button class="btn" onclick="addAlert('${route.id}')">Set alert</button>
+        </div>
+        <div class="alert-chips">${alertChips}</div>
+      </div>
+    </div>
+  `;
+}
+
+function setSort(field, routeId) {
+  if (state.sortField===field) state.sortDir = state.sortDir===1?-1:1;
+  else { state.sortField=field; state.sortDir=1; }
+  save();
+  const r = state.routes.find(r=>r.id===routeId);
+  if (r) renderMain(r);
+}
+
+async function refreshRoute(id) {
+  const r = state.routes.find(r=>r.id===id);
+  if (!r) return;
+  document.getElementById('origin').value = r.origin;
+  document.getElementById('dest').value = r.dest;
+  document.getElementById('depart').value = r.depart;
+  if (r.returnDate) document.getElementById('return-date').value = r.returnDate;
+  document.getElementById('cabin').value = r.cabin;
+  document.getElementById('adults').value = r.adults;
+  state.activeId = id;
+  document.getElementById('main-panel').innerHTML = `<div class="loading-state"><div class="spinner"></div><div style="font-size:13px;">Refreshing prices for ${r.origin} → ${r.dest}…</div></div>`;
+  try {
+    const result = await callClaude(r.origin, r.dest, r.depart, r.returnDate, r.cabin, r.adults);
+    r.searches.push({ ts: Date.now(), flights: result.flights, raw: result.summary });
+    if (r.searches.length > 60) r.searches = r.searches.slice(-60);
+    save(); renderSidebar(); renderMain(r);
+  } catch(err) { alert('Error: ' + err.message); renderMain(r); }
+}
+
+function addAlert(routeId) {
+  const p = parseFloat(document.getElementById('alert-price').value);
+  if (!p||p<1) return;
+  const r = state.routes.find(r=>r.id===routeId);
+  if (!r) return;
+  if (!r.alerts) r.alerts = [];
+  r.alerts.push({ price: p, set_at: Date.now() });
+  save(); renderMain(r);
+}
+
+function removeAlert(routeId, idx) {
+  const r = state.routes.find(r=>r.id===routeId);
+  if (!r||!r.alerts) return;
+  r.alerts.splice(idx,1);
+  save(); renderMain(r);
+}
+
+
+function openKeyModal() {
+  const existing = localStorage.getItem('fw_api_key') || '';
+  document.getElementById('api-key-input').value = existing;
+  document.getElementById('key-modal').classList.add('open');
+}
+function closeKeyModal() { document.getElementById('key-modal').classList.remove('open'); }
+function saveKey() {
+  const k = document.getElementById('api-key-input').value.trim();
+  if (!k.startsWith('sk-ant-')) { alert('That does not look like a valid Anthropic API key. It should start with sk-ant-'); return; }
+  localStorage.setItem('fw_api_key', k);
+  closeKeyModal();
+  document.getElementById('key-btn').textContent = '🔑 Key saved';
+  setTimeout(() => document.getElementById('key-btn').textContent = '🔑 API key', 2000);
+}
+document.getElementById('key-modal').addEventListener('click', function(e) { if (e.target===this) closeKeyModal(); });
+
+function openHelp() { document.getElementById('help-modal').classList.add('open'); }
+function closeHelp() { document.getElementById('help-modal').classList.remove('open'); }
+document.getElementById('help-modal').addEventListener('click', e => { if (e.target===document.getElementById('help-modal')) closeHelp(); });
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state,null,2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='flightwatch-backup.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
